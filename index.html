@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FaceAttend — Smart Attendance System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="18" stroke="var(--accent)" stroke-width="2"/>
+          <circle cx="20" cy="15" r="5" fill="var(--accent)"/>
+          <path d="M10 32c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="20" cy="15" r="2" fill="var(--bg)"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-title">FaceAttend</div>
+        <div class="logo-sub">Recognition System</div>
+      </div>
+    </div>
+  </div>
+  
+  <ul class="nav-menu">
+    <li><a href="#" class="nav-link active" data-page="dashboard">
+      <span class="nav-icon">◈</span> Dashboard
+    </a></li>
+    <li><a href="#" class="nav-link" data-page="recognition">
+      <span class="nav-icon">◉</span> Take Attendance
+    </a></li>
+    <li><a href="#" class="nav-link" data-page="register">
+      <span class="nav-icon">⊕</span> Register Student
+    </a></li>
+    <li><a href="#" class="nav-link" data-page="students">
+      <span class="nav-icon">◫</span> Students
+    </a></li>
+    <li><a href="#" class="nav-link" data-page="records">
+      <span class="nav-icon">▦</span> Attendance Records
+    </a></li>
+    <li><a href="#" class="nav-link" data-page="reports">
+      <span class="nav-icon">◭</span> Reports
+    </a></li>
+  </ul>
+
+  <div class="sidebar-footer">
+    <div class="db-status" id="dbStatus">
+      <span class="db-dot"></span>
+      <span class="db-text">Connecting...</span>
+    </div>
+  </div>
+</nav>
+
+<!-- Mobile toggle -->
+<button class="menu-toggle" id="menuToggle">☰</button>
+
+<!-- Main Content -->
+<main class="main" id="main">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="page-title" id="pageTitle">Dashboard</div>
+      <div class="breadcrumb" id="breadcrumb">Overview & Analytics</div>
+    </div>
+    <div class="topbar-right">
+      <div class="current-time" id="currentTime"></div>
+      <div class="current-date" id="currentDate"></div>
+    </div>
+  </header>
+
+  <!-- ===== DASHBOARD PAGE ===== -->
+  <section class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card stat-present">
+        <div class="stat-icon">✓</div>
+        <div class="stat-info">
+          <div class="stat-value" id="stat-present">0</div>
+          <div class="stat-label">Present Today</div>
+        </div>
+        <div class="stat-bg">PRESENT</div>
+      </div>
+      <div class="stat-card stat-late">
+        <div class="stat-icon">⏱</div>
+        <div class="stat-info">
+          <div class="stat-value" id="stat-late">0</div>
+          <div class="stat-label">Late Today</div>
+        </div>
+        <div class="stat-bg">LATE</div>
+      </div>
+      <div class="stat-card stat-absent">
+        <div class="stat-icon">✗</div>
+        <div class="stat-info">
+          <div class="stat-value" id="stat-absent">0</div>
+          <div class="stat-label">Absent Today</div>
+        </div>
+        <div class="stat-bg">ABSENT</div>
+      </div>
+      <div class="stat-card stat-total">
+        <div class="stat-icon">⊞</div>
+        <div class="stat-info">
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">Total Students</div>
+        </div>
+        <div class="stat-bg">TOTAL</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="card chart-card">
+        <div class="card-header">
+          <h3>Weekly Attendance</h3>
+          <span class="card-badge">Last 7 Days</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="weekChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Today's Attendance</h3>
+          <span class="card-badge" id="todayCount">0 records</span>
+        </div>
+        <div class="attendance-list" id="todayList">
+          <div class="empty-state">No attendance marked today</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== RECOGNITION PAGE ===== -->
+  <section class="page" id="page-recognition">
+    <div class="recognition-layout">
+      <div class="card camera-card">
+        <div class="card-header">
+          <h3>Face Recognition Camera</h3>
+          <div class="cam-controls">
+            <button class="btn btn-primary" id="startCam">▶ Start Camera</button>
+            <button class="btn btn-danger hidden" id="stopCam">■ Stop</button>
+          </div>
+        </div>
+        
+        <div class="camera-wrapper">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="canvas" style="display:none"></canvas>
+          <div class="camera-overlay" id="cameraOverlay">
+            <div class="camera-frame">
+              <div class="corner tl"></div>
+              <div class="corner tr"></div>
+              <div class="corner bl"></div>
+              <div class="corner br"></div>
+            </div>
+            <div class="scan-line" id="scanLine"></div>
+          </div>
+          <div class="camera-placeholder" id="cameraPlaceholder">
+            <div class="cam-icon">◉</div>
+            <p>Click "Start Camera" to begin</p>
+          </div>
+        </div>
+
+        <div class="recognition-info">
+          <div class="info-box">
+            <div class="info-label">Mode</div>
+            <div class="info-value" id="recMode">Idle</div>
+          </div>
+          <div class="info-box">
+            <div class="info-label">Face</div>
+            <div class="info-value" id="recFace">—</div>
+          </div>
+          <div class="info-box">
+            <div class="info-label">Confidence</div>
+            <div class="info-value" id="recConf">—</div>
+          </div>
+        </div>
+
+        <div class="cam-actions">
+          <button class="btn btn-success btn-lg" id="captureBtn" disabled>
+            ◉ Capture & Mark Attendance
+          </button>
+          <button class="btn btn-outline" id="manualBtn">✎ Manual Entry</button>
+        </div>
+      </div>
+
+      <div class="card result-card">
+        <div class="card-header">
+          <h3>Recognition Result</h3>
+        </div>
+        <div class="result-display" id="resultDisplay">
+          <div class="result-idle">
+            <div class="result-icon">◉</div>
+            <p>Waiting for face scan...</p>
+          </div>
+        </div>
+
+        <div class="card-header" style="margin-top:20px">
+          <h3>Recent Scans</h3>
+        </div>
+        <div class="recent-scans" id="recentScans">
+          <div class="empty-state">No scans yet</div>
+        </div>
+
+        <!-- Manual Entry Form -->
+        <div class="manual-form hidden" id="manualForm">
+          <div class="card-header"><h3>Manual Attendance</h3></div>
+          <div class="form-group">
+            <label>Student ID</label>
+            <input type="text" id="manualStudentId" class="form-control" placeholder="Enter Student ID">
+          </div>
+          <button class="btn btn-success" id="manualMarkBtn">Mark Attendance</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REGISTER PAGE ===== -->
+  <section class="page" id="page-register">
+    <div class="register-layout">
+      <div class="card">
+        <div class="card-header">
+          <h3>Register New Student</h3>
+        </div>
+        <form id="registerForm" class="register-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Student ID *</label>
+              <input type="text" id="reg-studentId" class="form-control" placeholder="e.g. STU001" required>
+            </div>
+            <div class="form-group">
+              <label>Full Name *</label>
+              <input type="text" id="reg-name" class="form-control" placeholder="Student Full Name" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email *</label>
+              <input type="email" id="reg-email" class="form-control" placeholder="student@email.com" required>
+            </div>
+            <div class="form-group">
+              <label>Department *</label>
+              <select id="reg-department" class="form-control" required>
+                <option value="">Select Department</option>
+                <option>Computer Science</option>
+                <option>Information Technology</option>
+                <option>Electronics</option>
+                <option>Mechanical</option>
+                <option>Civil</option>
+                <option>Electrical</option>
+                <option>Chemical</option>
+                <option>Mathematics</option>
+                <option>Physics</option>
+                <option>Commerce</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Class / Year *</label>
+              <select id="reg-class" class="form-control" required>
+                <option value="">Select Class</option>
+                <option>1st Year</option>
+                <option>2nd Year</option>
+                <option>3rd Year</option>
+                <option>4th Year</option>
+                <option>M.Tech 1st Year</option>
+                <option>M.Tech 2nd Year</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Profile Photo</label>
+              <input type="file" id="reg-photo" class="form-control" accept="image/*">
+            </div>
+          </div>
+
+          <div class="face-capture-section">
+            <h4>Face Data Capture</h4>
+            <p class="hint">Camera se face capture karein ya baad mein update karen</p>
+            <div class="face-capture-area">
+              <video id="regVideo" autoplay muted playsinline class="hidden"></video>
+              <canvas id="regCanvas" class="hidden"></canvas>
+              <div class="face-preview" id="facePrev">
+                <span>◉</span>
+                <p>No face captured</p>
+              </div>
+              <div class="face-btns">
+                <button type="button" class="btn btn-outline" id="openRegCam">📷 Open Camera</button>
+                <button type="button" class="btn btn-primary hidden" id="captureRegFace">Capture Face</button>
+                <button type="button" class="btn btn-danger hidden" id="closeRegCam">✕ Close</button>
+              </div>
+              <div class="face-status" id="faceStatus">
+                <span class="face-dot red"></span> No face data
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-success btn-lg">⊕ Register Student</button>
+            <button type="reset" class="btn btn-outline">↺ Reset Form</button>
+          </div>
+        </form>
+        <div class="form-message hidden" id="regMessage"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== STUDENTS PAGE ===== -->
+  <section class="page" id="page-students">
+    <div class="page-actions">
+      <div class="search-box">
+        <input type="text" id="studentSearch" class="form-control" placeholder="🔍 Search students...">
+      </div>
+      <select id="deptFilter" class="form-control" style="width:200px">
+        <option value="">All Departments</option>
+        <option>Computer Science</option>
+        <option>Information Technology</option>
+        <option>Electronics</option>
+        <option>Mechanical</option>
+        <option>Civil</option>
+        <option>Electrical</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="table-wrapper">
+        <table class="data-table" id="studentsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Department</th>
+              <th>Class</th>
+              <th>Face</th>
+              <th>Registered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="studentsBody">
+            <tr><td colspan="9" class="loading-cell">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== RECORDS PAGE ===== -->
+  <section class="page" id="page-records">
+    <div class="page-actions">
+      <input type="date" id="recDate" class="form-control" style="width:180px">
+      <select id="recStatus" class="form-control" style="width:150px">
+        <option value="">All Status</option>
+        <option>Present</option>
+        <option>Late</option>
+        <option>Absent</option>
+      </select>
+      <button class="btn btn-primary" id="filterRecords">Filter</button>
+      <button class="btn btn-outline" id="exportCSV">↓ Export CSV</button>
+    </div>
+    <div class="card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Department</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Method</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recordsBody">
+            <tr><td colspan="9" class="loading-cell">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REPORTS PAGE ===== -->
+  <section class="page" id="page-reports">
+    <div class="card">
+      <div class="card-header">
+        <h3>Student Attendance Report</h3>
+      </div>
+      <div class="report-filters">
+        <div class="form-group">
+          <label>Student ID</label>
+          <input type="text" id="rep-studentId" class="form-control" placeholder="Enter Student ID">
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="rep-start" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" id="rep-end" class="form-control">
+        </div>
+        <button class="btn btn-primary" id="generateReport">Generate Report</button>
+      </div>
+      <div id="reportOutput" class="report-output"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Toast Notification -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Modal -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" id="modal">
+    <div class="modal-header" id="modalHeader"></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn btn-outline" id="modalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
