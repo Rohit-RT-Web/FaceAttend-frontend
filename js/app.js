@@ -1,7 +1,7 @@
 // ===== FACE RECOGNITION ATTENDANCE SYSTEM =====
 // Main Application JavaScript
 
-const API = "https://faceattend-backend-1.onrender.com/api/";
+const API = "https://faceattend-backend-1.onrender.com/api";
 let videoStream = null;
 let regVideoStream = null;
 let capturedFaceDescriptor = null;
