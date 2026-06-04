@@ -12,6 +12,23 @@
     <link rel="stylesheet" href="/css/style.css" />
     <!-- Netlify Identity Widget -->
     <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script>
+      // Recovery token handler — widget load hone ke TURANT BAAD
+      // Yahi ek sahi jagah hai is code ko daalne ki
+      (function () {
+        var hash = window.location.hash;
+        if (
+          hash.indexOf("recovery_token=") !== -1 ||
+          hash.indexOf("invite_token=") !== -1 ||
+          hash.indexOf("confirmation_token=") !== -1
+        ) {
+          // netlifyIdentity already available hai yahan
+          window.netlifyIdentity.on("init", function () {
+            window.netlifyIdentity.open();
+          });
+        }
+      })();
+    </script>
   </head>
   <body>
     <!-- Sidebar -->
@@ -549,19 +566,5 @@
 
     <script src="/js/admin-auth.js"></script>
     <script src="/js/app.js"></script>
-
-    <!-- ===== NETLIFY IDENTITY PASSWORD RESET HANDLER ===== -->
-    <script>
-      // URL mein #recovery_token check karo — yeh password reset email se aata hai
-      if (
-        window.location.hash &&
-        window.location.hash.includes("recovery_token")
-      ) {
-        // Netlify Identity widget ko recovery mode mein open karo
-        window.netlifyIdentity.on("init", () => {
-          window.netlifyIdentity.open();
-        });
-      }
-    </script>
   </body>
 </html>
