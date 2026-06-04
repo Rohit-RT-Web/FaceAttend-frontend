@@ -42,7 +42,7 @@ function updateUIForRole() {
   if (adminBtn) {
     if (isAdmin) {
       const session = JSON.parse(localStorage.getItem(SESSION_KEY));
-      adminBtn.innerHTML = `🔓 ${session.email} — Logout`;
+      adminBtn.innerHTML = `🔓 Admin — Logout`;
       adminBtn.classList.add("btn-danger");
       adminBtn.classList.remove("btn-outline");
     } else {
