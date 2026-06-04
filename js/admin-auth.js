@@ -1,12 +1,8 @@
-// ===== ADMIN AUTH — CUSTOM LOGIN SYSTEM =====
-// LocalStorage based secure admin login
+// ===== ADMIN AUTH — MONGODB LOGIN SYSTEM =====
 
 const ADMIN_PAGES = ["dashboard", "register", "students", "records", "reports"];
-
-// Default credentials (change kar sakte ho)
-const ADMIN_EMAIL = "admin@faceattend.com";
-const ADMIN_PASSWORD = "admin@123";
 const SESSION_KEY = "fa_admin_session";
+const API_AUTH = "https://faceattend-backend-1.onrender.com/api/auth";
 
 // ===== Login check =====
 function isAdminLoggedIn() {
@@ -14,27 +10,10 @@ function isAdminLoggedIn() {
   if (!session) return false;
   try {
     const data = JSON.parse(session);
-    // 8 ghante ki session expiry
     return data.loggedIn && Date.now() - data.time < 8 * 60 * 60 * 1000;
   } catch {
     return false;
   }
-}
-
-// ===== Login =====
-function doAdminLogin(email, password) {
-  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-    localStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify({
-        loggedIn: true,
-        email: email,
-        time: Date.now(),
-      }),
-    );
-    return true;
-  }
-  return false;
 }
 
 // ===== Logout =====
@@ -117,6 +96,8 @@ function openForgotModal() {
   document.getElementById("forgotError").textContent = "";
   document.getElementById("forgotSuccess").style.display = "none";
   document.getElementById("forgotFormArea").style.display = "block";
+  // Email yaad rakho reset ke liye
+  window._resetEmail = null;
 }
 
 function closeForgotModal() {
@@ -136,6 +117,13 @@ function closeResetModal() {
   document.getElementById("resetModal").style.display = "none";
 }
 
+// ===== Button loading state =====
+function setLoading(btnId, loading, text) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.textContent = loading ? "⏳ Please wait..." : text;
+}
+
 // ===== Init Admin Auth =====
 function initAdminAuth() {
   // Admin button click
@@ -152,92 +140,151 @@ function initAdminAuth() {
     });
   }
 
-  // Login form submit
-  document.getElementById("loginSubmitBtn").addEventListener("click", () => {
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value;
-    const errorEl = document.getElementById("loginError");
+  // ── Login submit ──────────────────────────────────────────
+  document
+    .getElementById("loginSubmitBtn")
+    .addEventListener("click", async () => {
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const errorEl = document.getElementById("loginError");
 
-    if (!email || !password) {
-      errorEl.textContent = "⚠️ Email aur password dono bharein.";
-      return;
-    }
-
-    if (doAdminLogin(email, password)) {
-      closeLoginModal();
-      updateUIForRole();
-      if (typeof showToastNotification === "function") {
-        showToastNotification(`✅ Welcome, ${email}!`, "success");
+      if (!email || !password) {
+        errorEl.textContent = "⚠️ Email aur password dono bharein.";
+        return;
       }
-      navigateTo("dashboard", ["Dashboard", "Overview & Analytics"]);
-      if (typeof loadDashboard === "function") loadDashboard();
-    } else {
-      errorEl.textContent = "❌ Email ya password galat hai.";
-    }
-  });
 
-  // Enter key support on login
+      setLoading("loginSubmitBtn", true, "Login");
+      try {
+        const res = await fetch(`${API_AUTH}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          localStorage.setItem(
+            SESSION_KEY,
+            JSON.stringify({
+              loggedIn: true,
+              email: data.email,
+              time: Date.now(),
+            }),
+          );
+          closeLoginModal();
+          updateUIForRole();
+          if (typeof showToastNotification === "function") {
+            showToastNotification(`✅ Welcome, ${data.email}!`, "success");
+          }
+          navigateTo("dashboard", ["Dashboard", "Overview & Analytics"]);
+          if (typeof loadDashboard === "function") loadDashboard();
+        } else {
+          errorEl.textContent = "❌ " + data.message;
+        }
+      } catch (err) {
+        errorEl.textContent =
+          "❌ Server se connect nahi ho paya. Dobara try karein.";
+      }
+      setLoading("loginSubmitBtn", false, "Login");
+    });
+
+  // Enter key support
   ["loginEmail", "loginPassword"].forEach((id) => {
     document.getElementById(id).addEventListener("keydown", (e) => {
       if (e.key === "Enter") document.getElementById("loginSubmitBtn").click();
     });
   });
 
-  // Forgot password submit
-  document.getElementById("forgotSubmitBtn").addEventListener("click", () => {
-    const email = document.getElementById("forgotEmail").value.trim();
-    const errorEl = document.getElementById("forgotError");
-    const successEl = document.getElementById("forgotSuccess");
+  // ── Forgot password submit ────────────────────────────────
+  document
+    .getElementById("forgotSubmitBtn")
+    .addEventListener("click", async () => {
+      const email = document.getElementById("forgotEmail").value.trim();
+      const errorEl = document.getElementById("forgotError");
+      const successEl = document.getElementById("forgotSuccess");
 
-    if (!email) {
-      errorEl.textContent = "⚠️ Email address daalein.";
-      return;
-    }
+      if (!email) {
+        errorEl.textContent = "⚠️ Email address daalein.";
+        return;
+      }
 
-    if (email === ADMIN_EMAIL) {
-      // Email match — reset form dikhao
-      document.getElementById("forgotFormArea").style.display = "none";
-      successEl.style.display = "block";
-      setTimeout(() => {
-        closeForgotModal();
-        openResetModal();
-      }, 1500);
-    } else {
-      errorEl.textContent = "❌ Yeh email registered nahi hai.";
-    }
-  });
+      setLoading("forgotSubmitBtn", true, "Verify Email");
+      try {
+        const res = await fetch(`${API_AUTH}/verify-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
 
-  // Reset password submit
-  document.getElementById("resetSubmitBtn").addEventListener("click", () => {
-    const newPass = document.getElementById("resetNewPass").value;
-    const confirmPass = document.getElementById("resetConfirmPass").value;
-    const errorEl = document.getElementById("resetError");
+        if (data.success) {
+          window._resetEmail = email; // email yaad rakho
+          document.getElementById("forgotFormArea").style.display = "none";
+          successEl.style.display = "block";
+          setTimeout(() => {
+            closeForgotModal();
+            openResetModal();
+          }, 1500);
+        } else {
+          errorEl.textContent = "❌ " + data.message;
+        }
+      } catch (err) {
+        errorEl.textContent = "❌ Server se connect nahi ho paya.";
+      }
+      setLoading("forgotSubmitBtn", false, "Verify Email");
+    });
 
-    if (!newPass || !confirmPass) {
-      errorEl.textContent = "⚠️ Dono fields bharein.";
-      return;
-    }
-    if (newPass.length < 6) {
-      errorEl.textContent =
-        "⚠️ Password kam se kam 6 characters ka hona chahiye.";
-      return;
-    }
-    if (newPass !== confirmPass) {
-      errorEl.textContent = "❌ Dono passwords match nahi karte.";
-      return;
-    }
+  // ── Reset password submit ─────────────────────────────────
+  document
+    .getElementById("resetSubmitBtn")
+    .addEventListener("click", async () => {
+      const newPass = document.getElementById("resetNewPass").value;
+      const confirmPass = document.getElementById("resetConfirmPass").value;
+      const errorEl = document.getElementById("resetError");
 
-    // Password update (session mein save)
-    // Note: Production mein yeh server pe save hona chahiye
-    if (typeof showToastNotification === "function") {
-      showToastNotification(
-        "✅ Password successfully update ho gaya!",
-        "success",
-      );
-    }
-    closeResetModal();
-    openLoginModal();
-  });
+      if (!newPass || !confirmPass) {
+        errorEl.textContent = "⚠️ Dono fields bharein.";
+        return;
+      }
+      if (newPass.length < 6) {
+        errorEl.textContent =
+          "⚠️ Password kam se kam 6 characters ka hona chahiye.";
+        return;
+      }
+      if (newPass !== confirmPass) {
+        errorEl.textContent = "❌ Dono passwords match nahi karte.";
+        return;
+      }
+
+      setLoading("resetSubmitBtn", true, "Update Password");
+      try {
+        const res = await fetch(`${API_AUTH}/reset-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: window._resetEmail,
+            newPassword: newPass,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (typeof showToastNotification === "function") {
+            showToastNotification(
+              "✅ Password successfully update ho gaya!",
+              "success",
+            );
+          }
+          closeResetModal();
+          openLoginModal();
+        } else {
+          errorEl.textContent = "❌ " + data.message;
+        }
+      } catch (err) {
+        errorEl.textContent = "❌ Server se connect nahi ho paya.";
+      }
+      setLoading("resetSubmitBtn", false, "Update Password");
+    });
 
   // Modal close on backdrop click
   ["adminLoginModal", "forgotModal", "resetModal"].forEach((id) => {
@@ -248,6 +295,5 @@ function initAdminAuth() {
     });
   });
 
-  // Page load pe state check
   updateUIForRole();
 }
