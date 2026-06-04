@@ -552,16 +552,29 @@
 
     <!-- ===== NETLIFY IDENTITY PASSWORD RESET HANDLER ===== -->
     <script>
-      // URL mein #recovery_token check karo — yeh password reset email se aata hai
-      if (
-        window.location.hash &&
-        window.location.hash.includes("recovery_token")
-      ) {
-        // Netlify Identity widget ko recovery mode mein open karo
-        window.netlifyIdentity.on("init", () => {
-          window.netlifyIdentity.open();
-        });
-      }
+      // URL mein #recovery_token check karo - yeh password reset email se aata hai
+      (function () {
+        var hash = window.location.hash;
+        if (hash && hash.includes("recovery_token")) {
+          var opened = false;
+
+          function openRecovery() {
+            if (!opened) {
+              opened = true;
+              // "recovery" type se widget seedha password update screen dikhayega
+              window.netlifyIdentity.open("recovery");
+            }
+          }
+
+          // Agar init event already fire ho chuka ho
+          window.netlifyIdentity.on("init", function () {
+            setTimeout(openRecovery, 300);
+          });
+
+          // Safety net: agar init pehle hi fire ho chuka tha
+          setTimeout(openRecovery, 800);
+        }
+      })();
     </script>
   </body>
 </html>
