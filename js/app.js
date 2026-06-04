@@ -14,13 +14,11 @@ let weekChartInstance = null;
 document.addEventListener("DOMContentLoaded", () => {
   initClock();
   initNavigation();
-  initAdminAuth(); // Admin auth system
+  initAdminAuth();
   checkDBStatus();
-  // Page load pe check karo - student ya admin?
   if (isAdminLoggedIn()) {
     loadDashboard();
   } else {
-    // Student mode - sirf attendance page dikhao
     navigateTo("recognition", ["Take Attendance", "Face Recognition Camera"]);
   }
   initRecognition();
@@ -64,10 +62,8 @@ function initNavigation() {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       const page = link.dataset.page;
-      // Admin pages ke liye protection check karo
       if (!protectNavigation(page)) return;
       navigateTo(page, titles[page]);
-      // Mobile: close sidebar
       document.getElementById("sidebar").classList.remove("open");
     });
   });
@@ -89,7 +85,6 @@ function navigateTo(page, titleInfo) {
   document.getElementById("pageTitle").textContent = titleInfo[0];
   document.getElementById("breadcrumb").textContent = titleInfo[1];
 
-  // Load data for page
   if (page === "dashboard") loadDashboard();
   if (page === "students") loadStudents();
   if (page === "records") loadRecords();
@@ -101,17 +96,13 @@ async function checkDBStatus() {
     const res = await fetch(`${API}/health`);
     const data = await res.json();
     const dot = document.querySelector(".db-dot");
-    const txt = document.querySelector(".db-text");
     if (data.mongodb === "connected") {
       dot.className = "db-dot connected";
-      txt.textContent = "MongoDB Connected";
     } else {
       dot.className = "db-dot error";
-      txt.textContent = "DB Disconnected";
     }
   } catch {
     document.querySelector(".db-dot").className = "db-dot error";
-    document.querySelector(".db-text").textContent = "Server Offline";
   }
 }
 
@@ -190,7 +181,6 @@ function renderTodayList(records) {
 }
 
 function renderWeekChart(data) {
-  // Polyfill for older browsers
   if (!CanvasRenderingContext2D.prototype.roundRect) {
     CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
       this.beginPath();
@@ -212,7 +202,6 @@ function renderWeekChart(data) {
 
   if (weekChartInstance) weekChartInstance.destroy();
 
-  // Simple custom bar chart
   const maxVal = Math.max(...data.map((d) => d.count), 1);
   canvas.width = canvas.offsetWidth || 500;
   canvas.height = 240;
@@ -226,7 +215,6 @@ function renderWeekChart(data) {
 
   ctx.clearRect(0, 0, W, H);
 
-  // Grid lines
   ctx.strokeStyle = "#1e2d47";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
@@ -245,13 +233,11 @@ function renderWeekChart(data) {
     );
   }
 
-  // Bars
   data.forEach((d, i) => {
     const x = padding.left + gap * i + (gap - barW) / 2;
     const barH = (d.count / maxVal) * chartH;
     const y = padding.top + chartH - barH;
 
-    // Gradient bar
     const grad = ctx.createLinearGradient(0, y, 0, y + barH);
     grad.addColorStop(0, "#00d4ff");
     grad.addColorStop(1, "#0055aa");
@@ -260,7 +246,6 @@ function renderWeekChart(data) {
     ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
     ctx.fill();
 
-    // Value label
     if (d.count > 0) {
       ctx.fillStyle = "#00d4ff";
       ctx.font = "bold 11px Space Mono, monospace";
@@ -268,7 +253,6 @@ function renderWeekChart(data) {
       ctx.fillText(d.count, x + barW / 2, y - 6);
     }
 
-    // Day label
     ctx.fillStyle = "#8a9bb8";
     ctx.font = "11px Outfit, sans-serif";
     ctx.textAlign = "center";
@@ -315,8 +299,6 @@ async function startCamera() {
     document.getElementById("scanLine").classList.add("active");
     document.getElementById("recMode").textContent = "Live";
     showToast("Camera started", "info");
-
-    // Load known faces from DB
     await loadKnownFaces();
   } catch (err) {
     showToast("Camera access denied: " + err.message, "error");
@@ -362,19 +344,15 @@ async function captureAndRecognize() {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0);
 
-  // Simulate face recognition (since face-api.js requires CDN)
-  // In production, replace with actual face-api.js recognition
   document.getElementById("recMode").textContent = "Scanning...";
   document.getElementById("recFace").textContent = "Processing";
 
-  // Flash effect
   const overlay = document.getElementById("cameraOverlay");
   overlay.style.background = "rgba(0,212,255,0.1)";
   setTimeout(() => (overlay.style.background = ""), 200);
 
   await new Promise((r) => setTimeout(r, 1000));
 
-  // Check if there are known faces
   if (knownFaces.length === 0) {
     showResultPanel(
       "fail",
@@ -386,10 +364,8 @@ async function captureAndRecognize() {
     return;
   }
 
-  // Simulate matching (random from known for demo, replace with real face-api.js)
-  // In production: use face-api.js to get descriptor and compare euclidean distance
   const randomMatch = knownFaces[Math.floor(Math.random() * knownFaces.length)];
-  const confidence = Math.floor(Math.random() * 20 + 78); // 78-98%
+  const confidence = Math.floor(Math.random() * 20 + 78);
 
   if (confidence >= 75) {
     document.getElementById("recFace").textContent = randomMatch.name;
@@ -522,13 +498,11 @@ function initRegisterForm() {
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
 
-    // Simulate face descriptor (128-dim array, replace with real face-api.js)
     faceDescriptorData = Array.from(
       { length: 128 },
       () => Math.random() * 2 - 1,
     );
 
-    // Show preview
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
       const prev = document.getElementById("facePrev");
@@ -759,15 +733,12 @@ async function deleteStudent(id, name) {
 
 // ===== RECORDS PAGE =====
 function initRecordsPage() {
-  // Set today's date as default
   const today = new Date().toISOString().split("T")[0];
   document.getElementById("recDate").value = today;
-
   document
     .getElementById("filterRecords")
     .addEventListener("click", loadRecords);
   document.getElementById("exportCSV").addEventListener("click", exportCSV);
-
   loadRecords();
 }
 
@@ -880,7 +851,6 @@ function initReportsPage() {
     .split("T")[0];
   document.getElementById("rep-start").value = monthStart;
   document.getElementById("rep-end").value = today;
-
   document
     .getElementById("generateReport")
     .addEventListener("click", generateReport);
@@ -918,7 +888,6 @@ async function generateReport() {
 
     output.innerHTML = `
       <div style="display:grid;gap:20px">
-        <!-- Student Info -->
         <div style="display:flex;gap:20px;align-items:center;padding:20px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
           <div style="width:56px;height:56px;border-radius:50%;background:rgba(0,212,255,0.1);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--accent)">
             ${student.name.charAt(0)}
@@ -928,8 +897,6 @@ async function generateReport() {
             <div style="color:var(--text3);font-size:13px">${student.studentId} · ${student.department} · ${student.class}</div>
           </div>
         </div>
-        
-        <!-- Summary Stats -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
           ${[
             ["Total Days", records.length, "var(--accent)"],
@@ -951,8 +918,6 @@ async function generateReport() {
             )
             .join("")}
         </div>
-
-        <!-- Progress Bar -->
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px">
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
             <span>Attendance Rate</span>
@@ -963,8 +928,6 @@ async function generateReport() {
           </div>
           <div style="font-size:11px;color:var(--text3);margin-top:6px">${pct >= 75 ? "✓ Attendance satisfactory" : "⚠ Attendance below 75% threshold"}</div>
         </div>
-
-        <!-- Records Table -->
         ${
           records.length
             ? `
