@@ -10,8 +10,6 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/style.css" />
-    <!-- Netlify Identity Widget -->
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   </head>
   <body>
     <!-- Sidebar -->
@@ -550,18 +548,379 @@
     <script src="/js/admin-auth.js"></script>
     <script src="/js/app.js"></script>
 
-    <!-- ===== NETLIFY IDENTITY PASSWORD RESET HANDLER ===== -->
-    <script>
-      // Recovery token handler - window load ke baad run karo
-      window.addEventListener("load", function () {
-        var hash = window.location.hash;
-        if (hash && hash.includes("recovery_token")) {
-          // Widget fully ready hone ka wait karo
-          window.netlifyIdentity.on("init", function () {
-            window.netlifyIdentity.open("recovery");
-          });
-        }
-      });
-    </script>
+    <!-- ===== ADMIN LOGIN MODAL ===== -->
+    <div
+      id="adminLoginModal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          width: 90%;
+          max-width: 400px;
+          padding: 32px;
+        "
+      >
+        <h2 style="margin: 0 0 6px; color: var(--accent); font-size: 20px">
+          🔐 Admin Login
+        </h2>
+        <p style="margin: 0 0 24px; color: var(--text2); font-size: 13px">
+          FaceAttend admin panel mein login karein
+        </p>
+        <div style="margin-bottom: 16px">
+          <label
+            style="
+              display: block;
+              color: var(--text2);
+              font-size: 12px;
+              margin-bottom: 6px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            "
+            >Email</label
+          >
+          <input
+            id="loginEmail"
+            type="email"
+            placeholder="admin@example.com"
+            style="
+              width: 100%;
+              padding: 10px 14px;
+              background: var(--bg3);
+              border: 1px solid var(--border2);
+              border-radius: 8px;
+              color: var(--text);
+              font-size: 14px;
+              box-sizing: border-box;
+              outline: none;
+            "
+          />
+        </div>
+        <div style="margin-bottom: 8px">
+          <label
+            style="
+              display: block;
+              color: var(--text2);
+              font-size: 12px;
+              margin-bottom: 6px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            "
+            >Password</label
+          >
+          <input
+            id="loginPassword"
+            type="password"
+            placeholder="••••••••"
+            style="
+              width: 100%;
+              padding: 10px 14px;
+              background: var(--bg3);
+              border: 1px solid var(--border2);
+              border-radius: 8px;
+              color: var(--text);
+              font-size: 14px;
+              box-sizing: border-box;
+              outline: none;
+            "
+          />
+        </div>
+        <div style="text-align: right; margin-bottom: 16px">
+          <a
+            href="#"
+            onclick="
+              openForgotModal();
+              return false;
+            "
+            style="color: var(--accent); font-size: 12px; text-decoration: none"
+            >Forgot Password?</a
+          >
+        </div>
+        <p
+          id="loginError"
+          style="
+            color: #ff4d4d;
+            font-size: 13px;
+            margin: 0 0 16px;
+            min-height: 18px;
+          "
+        ></p>
+        <div style="display: flex; gap: 10px">
+          <button
+            onclick="closeLoginModal()"
+            style="
+              flex: 1;
+              padding: 10px;
+              background: var(--bg3);
+              border: 1px solid var(--border2);
+              border-radius: 8px;
+              color: var(--text2);
+              cursor: pointer;
+              font-size: 14px;
+            "
+          >
+            Cancel
+          </button>
+          <button
+            id="loginSubmitBtn"
+            style="
+              flex: 2;
+              padding: 10px;
+              background: var(--accent);
+              border: none;
+              border-radius: 8px;
+              color: #000;
+              font-weight: 700;
+              cursor: pointer;
+              font-size: 14px;
+            "
+          >
+            Login
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== FORGOT PASSWORD MODAL ===== -->
+    <div
+      id="forgotModal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          width: 90%;
+          max-width: 400px;
+          padding: 32px;
+        "
+      >
+        <h2 style="margin: 0 0 6px; color: var(--accent); font-size: 20px">
+          🔑 Forgot Password
+        </h2>
+        <p style="margin: 0 0 24px; color: var(--text2); font-size: 13px">
+          Apna registered email daalein
+        </p>
+        <div id="forgotFormArea">
+          <div style="margin-bottom: 16px">
+            <label
+              style="
+                display: block;
+                color: var(--text2);
+                font-size: 12px;
+                margin-bottom: 6px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+              "
+              >Email</label
+            >
+            <input
+              id="forgotEmail"
+              type="email"
+              placeholder="admin@example.com"
+              style="
+                width: 100%;
+                padding: 10px 14px;
+                background: var(--bg3);
+                border: 1px solid var(--border2);
+                border-radius: 8px;
+                color: var(--text);
+                font-size: 14px;
+                box-sizing: border-box;
+                outline: none;
+              "
+            />
+          </div>
+          <p
+            id="forgotError"
+            style="
+              color: #ff4d4d;
+              font-size: 13px;
+              margin: 0 0 16px;
+              min-height: 18px;
+            "
+          ></p>
+          <div style="display: flex; gap: 10px">
+            <button
+              onclick="
+                closeForgotModal();
+                openLoginModal();
+              "
+              style="
+                flex: 1;
+                padding: 10px;
+                background: var(--bg3);
+                border: 1px solid var(--border2);
+                border-radius: 8px;
+                color: var(--text2);
+                cursor: pointer;
+                font-size: 14px;
+              "
+            >
+              Back
+            </button>
+            <button
+              id="forgotSubmitBtn"
+              style="
+                flex: 2;
+                padding: 10px;
+                background: var(--accent);
+                border: none;
+                border-radius: 8px;
+                color: #000;
+                font-weight: 700;
+                cursor: pointer;
+                font-size: 14px;
+              "
+            >
+              Verify Email
+            </button>
+          </div>
+        </div>
+        <div
+          id="forgotSuccess"
+          style="display: none; text-align: center; padding: 16px 0"
+        >
+          <div style="font-size: 40px; margin-bottom: 12px">✅</div>
+          <p style="color: var(--text); font-size: 15px; margin: 0">
+            Email verified! Password reset karo...
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== RESET PASSWORD MODAL ===== -->
+    <div
+      id="resetModal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        style="
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          width: 90%;
+          max-width: 400px;
+          padding: 32px;
+        "
+      >
+        <h2 style="margin: 0 0 6px; color: var(--accent); font-size: 20px">
+          🔒 Reset Password
+        </h2>
+        <p style="margin: 0 0 24px; color: var(--text2); font-size: 13px">
+          Naya password set karein
+        </p>
+        <div style="margin-bottom: 16px">
+          <label
+            style="
+              display: block;
+              color: var(--text2);
+              font-size: 12px;
+              margin-bottom: 6px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            "
+            >New Password</label
+          >
+          <input
+            id="resetNewPass"
+            type="password"
+            placeholder="••••••••"
+            style="
+              width: 100%;
+              padding: 10px 14px;
+              background: var(--bg3);
+              border: 1px solid var(--border2);
+              border-radius: 8px;
+              color: var(--text);
+              font-size: 14px;
+              box-sizing: border-box;
+              outline: none;
+            "
+          />
+        </div>
+        <div style="margin-bottom: 16px">
+          <label
+            style="
+              display: block;
+              color: var(--text2);
+              font-size: 12px;
+              margin-bottom: 6px;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            "
+            >Confirm Password</label
+          >
+          <input
+            id="resetConfirmPass"
+            type="password"
+            placeholder="••••••••"
+            style="
+              width: 100%;
+              padding: 10px 14px;
+              background: var(--bg3);
+              border: 1px solid var(--border2);
+              border-radius: 8px;
+              color: var(--text);
+              font-size: 14px;
+              box-sizing: border-box;
+              outline: none;
+            "
+          />
+        </div>
+        <p
+          id="resetError"
+          style="
+            color: #ff4d4d;
+            font-size: 13px;
+            margin: 0 0 16px;
+            min-height: 18px;
+          "
+        ></p>
+        <button
+          id="resetSubmitBtn"
+          style="
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 15px;
+          "
+        >
+          Update Password
+        </button>
+      </div>
+    </div>
   </body>
 </html>
