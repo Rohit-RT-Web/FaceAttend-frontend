@@ -14,8 +14,15 @@ let weekChartInstance = null;
 document.addEventListener("DOMContentLoaded", () => {
   initClock();
   initNavigation();
+  initAdminAuth(); // Admin auth system
   checkDBStatus();
-  loadDashboard();
+  // Page load pe check karo - student ya admin?
+  if (isAdminLoggedIn()) {
+    loadDashboard();
+  } else {
+    // Student mode - sirf attendance page dikhao
+    navigateTo("recognition", ["Take Attendance", "Face Recognition Camera"]);
+  }
   initRecognition();
   initRegisterForm();
   initStudentsPage();
@@ -57,6 +64,8 @@ function initNavigation() {
     link.addEventListener("click", (e) => {
       e.preventDefault();
       const page = link.dataset.page;
+      // Admin pages ke liye protection check karo
+      if (!protectNavigation(page)) return;
       navigateTo(page, titles[page]);
       // Mobile: close sidebar
       document.getElementById("sidebar").classList.remove("open");
