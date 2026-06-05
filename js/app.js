@@ -334,10 +334,42 @@ async function loadKnownFaces() {
   }
 }
 
+// face-api models load tracker
+let faceApiModelsLoaded = false;
+
+async function loadFaceApiModels() {
+  if (faceApiModelsLoaded) return true;
+  try {
+    if (typeof faceapi === "undefined") {
+      alert("face-api.js library load nahi hui! Page reload karein.");
+      return false;
+    }
+    const MODEL_URL =
+      "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/model";
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+    ]);
+    faceApiModelsLoaded = true;
+    return true;
+  } catch (err) {
+    console.error("Models load error:", err);
+    return false;
+  }
+}
+
 async function captureAndRecognize() {
   if (!videoStream) return;
 
   const video = document.getElementById("video");
+
+  // Video ready check
+  if (!video.videoWidth || !video.videoHeight) {
+    showResultPanel("fail", null, "Camera ready nahi hai. Thoda wait karein.");
+    return;
+  }
+
   const canvas = document.getElementById("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -351,8 +383,6 @@ async function captureAndRecognize() {
   overlay.style.background = "rgba(0,212,255,0.1)";
   setTimeout(() => (overlay.style.background = ""), 200);
 
-  await new Promise((r) => setTimeout(r, 1000));
-
   if (knownFaces.length === 0) {
     showResultPanel(
       "fail",
@@ -364,23 +394,90 @@ async function captureAndRecognize() {
     return;
   }
 
-  const randomMatch = knownFaces[Math.floor(Math.random() * knownFaces.length)];
-  const confidence = Math.floor(Math.random() * 20 + 78);
+  try {
+    // Models load karo
+    document.getElementById("recMode").textContent = "Loading AI...";
+    const modelsReady = await loadFaceApiModels();
+    if (!modelsReady) {
+      showResultPanel(
+        "fail",
+        null,
+        "Face AI models load nahi hue. Internet check karein aur reload karein.",
+      );
+      return;
+    }
 
-  if (confidence >= 75) {
-    document.getElementById("recFace").textContent = randomMatch.name;
+    document.getElementById("recMode").textContent = "Detecting...";
+
+    // Face detect karo
+    const detection = await faceapi
+      .detectSingleFace(canvas)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    // Koi face nahi mila - bilkul attendance mark nahi hogi
+    if (!detection) {
+      document.getElementById("recFace").textContent = "No Face";
+      document.getElementById("recMode").textContent = "Not Found";
+      showResultPanel(
+        "fail",
+        null,
+        "❌ Koi face detect nahi hua. Camera ke seedha saamne aao.",
+      );
+      return;
+    }
+
+    // Valid face descriptors wale students
+    const labeled = knownFaces
+      .filter(
+        (s) =>
+          Array.isArray(s.faceDescriptor) && s.faceDescriptor.length === 128,
+      )
+      .map(
+        (s) =>
+          new faceapi.LabeledFaceDescriptors(s.studentId, [
+            new Float32Array(s.faceDescriptor),
+          ]),
+      );
+
+    if (labeled.length === 0) {
+      showResultPanel(
+        "fail",
+        null,
+        "Kisi student ka face registered nahi hai. Register mein face scan karein.",
+      );
+      return;
+    }
+
+    // Strict matching - 0.42 threshold
+    const THRESHOLD = 0.42;
+    const matcher = new faceapi.FaceMatcher(labeled, THRESHOLD);
+    const best = matcher.findBestMatch(detection.descriptor);
+    const confidence = Math.round((1 - best.distance) * 100);
+
+    if (best.label === "unknown" || best.distance > THRESHOLD) {
+      document.getElementById("recFace").textContent = "Unknown";
+      document.getElementById("recConf").textContent = confidence + "%";
+      document.getElementById("recMode").textContent = "No Match";
+      showResultPanel(
+        "fail",
+        null,
+        `❌ Face match nahi hua (${confidence}%). Aap registered nahi hain.`,
+      );
+      return;
+    }
+
+    // Match mila!
+    const student = knownFaces.find((s) => s.studentId === best.label);
+    document.getElementById("recFace").textContent =
+      student?.name || best.label;
     document.getElementById("recConf").textContent = confidence + "%";
     document.getElementById("recMode").textContent = "Matched";
-    await markAttendance(randomMatch.studentId, confidence, "Face Recognition");
-  } else {
-    document.getElementById("recFace").textContent = "Unknown";
-    document.getElementById("recConf").textContent = confidence + "%";
-    document.getElementById("recMode").textContent = "No Match";
-    showResultPanel(
-      "fail",
-      null,
-      "Face recognize nahi ho saka. Dobara try karein.",
-    );
+    await markAttendance(best.label, confidence, "Face Recognition");
+  } catch (err) {
+    console.error("Recognition error:", err);
+    showResultPanel("fail", null, "Error: " + err.message);
+    document.getElementById("recMode").textContent = "Error";
   }
 }
 
@@ -491,30 +588,68 @@ function initRegisterForm() {
 
   document.getElementById("closeRegCam").addEventListener("click", closeRegCam);
 
-  document.getElementById("captureRegFace").addEventListener("click", () => {
-    const video = document.getElementById("regVideo");
-    const canvas = document.getElementById("regCanvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
+  document
+    .getElementById("captureRegFace")
+    .addEventListener("click", async () => {
+      const video = document.getElementById("regVideo");
+      const canvas = document.getElementById("regCanvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
 
-    faceDescriptorData = Array.from(
-      { length: 128 },
-      () => Math.random() * 2 - 1,
-    );
+      document.getElementById("faceStatus").innerHTML =
+        '<span class="face-dot yellow"></span> Face scan ho raha hai...';
 
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const prev = document.getElementById("facePrev");
-      prev.innerHTML = `<img src="${url}" alt="Face">`;
-      prev.classList.remove("hidden");
+      try {
+        // Models load karo
+        const modelsReady = await loadFaceApiModels();
+        if (!modelsReady) {
+          showToast(
+            "Face models load nahi hue. Internet check karein.",
+            "error",
+          );
+          document.getElementById("faceStatus").innerHTML =
+            '<span class="face-dot red"></span> Models load failed';
+          return;
+        }
+
+        // Real face detect karo
+        const detection = await faceapi
+          .detectSingleFace(canvas)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          showToast(
+            "Face nahi dikh raha! Camera ke seedha saamne aao.",
+            "warn",
+          );
+          document.getElementById("faceStatus").innerHTML =
+            '<span class="face-dot red"></span> Face detect nahi hua - dobara try karein';
+          return;
+        }
+
+        // Real 128-point descriptor save karo
+        faceDescriptorData = Array.from(detection.descriptor);
+
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const prev = document.getElementById("facePrev");
+          prev.innerHTML = `<img src="${url}" alt="Face">`;
+          prev.classList.remove("hidden");
+        });
+
+        document.getElementById("faceStatus").innerHTML =
+          '<span class="face-dot green"></span> Face successfully captured!';
+        closeRegCam();
+        showToast("✅ Face captured!", "success");
+      } catch (err) {
+        console.error("Capture error:", err);
+        showToast("Error: " + err.message, "error");
+        document.getElementById("faceStatus").innerHTML =
+          '<span class="face-dot red"></span> Error - dobara try karein';
+      }
     });
-
-    document.getElementById("faceStatus").innerHTML =
-      '<span class="face-dot green"></span> Face captured!';
-    closeRegCam();
-    showToast("Face captured!", "success");
-  });
 
   document
     .getElementById("registerForm")
