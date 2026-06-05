@@ -358,11 +358,44 @@ async function captureAndRecognize() {
   if (!videoStream) return;
 
   const video = document.getElementById("video");
+
+  // VIDEO READY CHECK — video chal raha hai aur proper frame aa raha hai
+  if (
+    video.readyState < 2 ||
+    video.videoWidth === 0 ||
+    video.videoHeight === 0
+  ) {
+    showResultPanel(
+      "fail",
+      null,
+      "Camera abhi ready nahi hai. Thoda wait karein.",
+    );
+    return;
+  }
+
   const canvas = document.getElementById("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0);
+
+  // BLANK FRAME CHECK — agar frame bilkul dark/blank hai toh reject karo
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+  let totalBrightness = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    totalBrightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+  }
+  const avgBrightness = totalBrightness / (pixels.length / 4);
+  if (avgBrightness < 10) {
+    showResultPanel(
+      "fail",
+      null,
+      "Camera ka frame blank/dark hai. Camera properly open karo.",
+    );
+    document.getElementById("recMode").textContent = "No Camera";
+    return;
+  }
 
   document.getElementById("recMode").textContent = "Scanning...";
   document.getElementById("recFace").textContent = "Processing";
@@ -400,14 +433,30 @@ async function captureAndRecognize() {
       .withFaceLandmarks()
       .withFaceDescriptor();
 
+    // STRICT CHECK — koi bhi face nahi dikh raha toh bilkul attendance mark nahi hogi
     if (!detections) {
       document.getElementById("recFace").textContent = "No Face";
       document.getElementById("recMode").textContent = "Not Found";
       showResultPanel(
         "fail",
         null,
-        "Camera mein koi face nahi dikh raha. Seedha camera ke saamne aao aur try karein.",
+        "❌ Camera mein koi bhi face detect nahi hua. Seedha camera ke saamne aao.",
       );
+      return;
+    }
+
+    // FACE SIZE CHECK — bahut chota face reject karo (door se scan rok)
+    const box = detections.detection.box;
+    const faceArea = box.width * box.height;
+    const frameArea = canvas.width * canvas.height;
+    const faceRatio = faceArea / frameArea;
+    if (faceRatio < 0.03) {
+      showResultPanel(
+        "fail",
+        null,
+        "❌ Face bahut door hai. Camera ke paas aao aur dobara try karein.",
+      );
+      document.getElementById("recMode").textContent = "Too Far";
       return;
     }
 
@@ -415,6 +464,7 @@ async function captureAndRecognize() {
     const queryDescriptor = detections.descriptor;
 
     // Sirf woh students jinke paas valid 128-point faceDescriptor hai
+    // Fake random descriptors (jo pehle save hue the) automatically filter ho jaayenge
     const labeledDescriptors = knownFaces
       .filter(
         (s) =>
@@ -436,23 +486,27 @@ async function captureAndRecognize() {
       return;
     }
 
-    // THRESHOLD = 0.45 — strict matching, galat match nahi hoga
-    // 0 = perfect match, 1 = bilkul alag
-    const THRESHOLD = 0.45;
+    // THRESHOLD = 0.42 — aur strict, galat match bilkul nahi hoga
+    const THRESHOLD = 0.42;
     const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, THRESHOLD);
     const bestMatch = faceMatcher.findBestMatch(queryDescriptor);
 
     const distance = bestMatch.distance;
     const confidence = Math.round((1 - distance) * 100);
 
-    if (bestMatch.label === "unknown" || distance > THRESHOLD) {
+    // MINIMUM CONFIDENCE CHECK — 60% se kam confidence pe match nahi manega
+    if (
+      bestMatch.label === "unknown" ||
+      distance > THRESHOLD ||
+      confidence < 60
+    ) {
       document.getElementById("recFace").textContent = "Unknown";
       document.getElementById("recConf").textContent = confidence + "%";
       document.getElementById("recMode").textContent = "No Match";
       showResultPanel(
         "fail",
         null,
-        `Face match nahi hua. Aap registered nahi hain ya lighting/angle alag hai.`,
+        `❌ Face match nahi hua (${confidence}% confidence). Registered student nahi hai.`,
       );
       return;
     }
@@ -584,30 +638,67 @@ function initRegisterForm() {
 
   document.getElementById("closeRegCam").addEventListener("click", closeRegCam);
 
-  document.getElementById("captureRegFace").addEventListener("click", () => {
-    const video = document.getElementById("regVideo");
-    const canvas = document.getElementById("regCanvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
+  document
+    .getElementById("captureRegFace")
+    .addEventListener("click", async () => {
+      const video = document.getElementById("regVideo");
+      const canvas = document.getElementById("regCanvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
 
-    faceDescriptorData = Array.from(
-      { length: 128 },
-      () => Math.random() * 2 - 1,
-    );
+      // Real face-api.js se descriptor capture karo
+      document.getElementById("faceStatus").innerHTML =
+        '<span class="face-dot yellow"></span> Face scan ho raha hai...';
 
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const prev = document.getElementById("facePrev");
-      prev.innerHTML = `<img src="${url}" alt="Face">`;
-      prev.classList.remove("hidden");
+      try {
+        const modelsReady = await loadFaceApiModels();
+        if (!modelsReady) {
+          showToast(
+            "Face models load nahi hue. Internet check karein.",
+            "error",
+          );
+          document.getElementById("faceStatus").innerHTML =
+            '<span class="face-dot red"></span> Models load failed';
+          return;
+        }
+
+        const detection = await faceapi
+          .detectSingleFace(canvas)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!detection) {
+          showToast(
+            "Face nahi dikh raha! Seedha camera ke saamne aao aur dobara try karein.",
+            "warn",
+          );
+          document.getElementById("faceStatus").innerHTML =
+            '<span class="face-dot red"></span> Face detect nahi hua — dobara try karein';
+          return;
+        }
+
+        // Real 128-point descriptor save karo
+        faceDescriptorData = Array.from(detection.descriptor);
+
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const prev = document.getElementById("facePrev");
+          prev.innerHTML = `<img src="${url}" alt="Face">`;
+          prev.classList.remove("hidden");
+        });
+
+        document.getElementById("faceStatus").innerHTML =
+          '<span class="face-dot green"></span> Face successfully captured!';
+        closeRegCam();
+        showToast("✅ Face captured!", "success");
+      } catch (err) {
+        console.error("Face capture error:", err);
+        showToast("Face capture mein error: " + err.message, "error");
+        document.getElementById("faceStatus").innerHTML =
+          '<span class="face-dot red"></span> Error — dobara try karein';
+      }
     });
-
-    document.getElementById("faceStatus").innerHTML =
-      '<span class="face-dot green"></span> Face captured!';
-    closeRegCam();
-    showToast("Face captured!", "success");
-  });
 
   document
     .getElementById("registerForm")
