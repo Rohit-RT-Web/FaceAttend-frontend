@@ -334,6 +334,26 @@ async function loadKnownFaces() {
   }
 }
 
+// face-api.js models loaded check
+let faceApiModelsLoaded = false;
+
+async function loadFaceApiModels() {
+  if (faceApiModelsLoaded) return true;
+  try {
+    const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+    ]);
+    faceApiModelsLoaded = true;
+    return true;
+  } catch (err) {
+    console.error("Face API models load nahi hue:", err);
+    return false;
+  }
+}
+
 async function captureAndRecognize() {
   if (!videoStream) return;
 
@@ -351,8 +371,6 @@ async function captureAndRecognize() {
   overlay.style.background = "rgba(0,212,255,0.1)";
   setTimeout(() => (overlay.style.background = ""), 200);
 
-  await new Promise((r) => setTimeout(r, 1000));
-
   if (knownFaces.length === 0) {
     showResultPanel(
       "fail",
@@ -364,23 +382,98 @@ async function captureAndRecognize() {
     return;
   }
 
-  const randomMatch = knownFaces[Math.floor(Math.random() * knownFaces.length)];
-  const confidence = Math.floor(Math.random() * 20 + 78);
+  try {
+    // Face API models load karo
+    const modelsReady = await loadFaceApiModels();
+    if (!modelsReady) {
+      showResultPanel(
+        "fail",
+        null,
+        "Face recognition models load nahi hue. Internet connection check karein.",
+      );
+      return;
+    }
 
-  if (confidence >= 75) {
-    document.getElementById("recFace").textContent = randomMatch.name;
+    // Camera se live face detect karo
+    const detections = await faceapi
+      .detectSingleFace(canvas)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (!detections) {
+      document.getElementById("recFace").textContent = "No Face";
+      document.getElementById("recMode").textContent = "Not Found";
+      showResultPanel(
+        "fail",
+        null,
+        "Camera mein koi face nahi dikh raha. Seedha camera ke saamne aao aur try karein.",
+      );
+      return;
+    }
+
+    // Captured face ka 128-point descriptor
+    const queryDescriptor = detections.descriptor;
+
+    // Sirf woh students jinke paas valid 128-point faceDescriptor hai
+    const labeledDescriptors = knownFaces
+      .filter(
+        (s) =>
+          Array.isArray(s.faceDescriptor) && s.faceDescriptor.length === 128,
+      )
+      .map(
+        (s) =>
+          new faceapi.LabeledFaceDescriptors(s.studentId, [
+            new Float32Array(s.faceDescriptor),
+          ]),
+      );
+
+    if (labeledDescriptors.length === 0) {
+      showResultPanel(
+        "fail",
+        null,
+        "Kisi bhi student ka face data registered nahi hai. Pehle face scan ke saath register karein.",
+      );
+      return;
+    }
+
+    // THRESHOLD = 0.45 — strict matching, galat match nahi hoga
+    // 0 = perfect match, 1 = bilkul alag
+    const THRESHOLD = 0.45;
+    const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, THRESHOLD);
+    const bestMatch = faceMatcher.findBestMatch(queryDescriptor);
+
+    const distance = bestMatch.distance;
+    const confidence = Math.round((1 - distance) * 100);
+
+    if (bestMatch.label === "unknown" || distance > THRESHOLD) {
+      document.getElementById("recFace").textContent = "Unknown";
+      document.getElementById("recConf").textContent = confidence + "%";
+      document.getElementById("recMode").textContent = "No Match";
+      showResultPanel(
+        "fail",
+        null,
+        `Face match nahi hua. Aap registered nahi hain ya lighting/angle alag hai.`,
+      );
+      return;
+    }
+
+    // Sahi student mila!
+    const matchedStudent = knownFaces.find(
+      (s) => s.studentId === bestMatch.label,
+    );
+    document.getElementById("recFace").textContent =
+      matchedStudent?.name || bestMatch.label;
     document.getElementById("recConf").textContent = confidence + "%";
     document.getElementById("recMode").textContent = "Matched";
-    await markAttendance(randomMatch.studentId, confidence, "Face Recognition");
-  } else {
-    document.getElementById("recFace").textContent = "Unknown";
-    document.getElementById("recConf").textContent = confidence + "%";
-    document.getElementById("recMode").textContent = "No Match";
+    await markAttendance(bestMatch.label, confidence, "Face Recognition");
+  } catch (err) {
+    console.error("Recognition error:", err);
     showResultPanel(
       "fail",
       null,
-      "Face recognize nahi ho saka. Dobara try karein.",
+      "Face recognition mein error aaya: " + err.message,
     );
+    document.getElementById("recMode").textContent = "Error";
   }
 }
 
