@@ -1016,9 +1016,10 @@ async function generateReport() {
     }
 
     const { student, records, summary } = data;
+    const absentCount = summary.absent ?? 0;
     const pct =
-      records.length > 0
-        ? Math.round((summary.present / records.length) * 100)
+      summary.total > 0
+        ? Math.round(((summary.present + summary.late) / summary.total) * 100)
         : 0;
 
     output.innerHTML = `
@@ -1032,11 +1033,12 @@ async function generateReport() {
             <div style="color:var(--text3);font-size:13px">${student.studentId} · ${student.department} · ${student.class}</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
           ${[
-            ["Total Days", records.length, "var(--accent)"],
+            ["Working Days", summary.total, "var(--accent)"],
             ["Present", summary.present, "var(--green)"],
             ["Late", summary.late, "var(--orange)"],
+            ["Absent", absentCount, "var(--red)"],
             [
               "Attendance %",
               pct + "%",

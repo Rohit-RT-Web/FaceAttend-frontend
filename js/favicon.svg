@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0a0a0f"/>
+  <!-- Face scan frame corners -->
+  <path d="M10 22 L10 12 L20 12" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 12 L54 12 L54 22" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M10 42 L10 52 L20 52" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 52 L54 52 L54 42" stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Face circle -->
+  <circle cx="32" cy="28" r="10" stroke="#00d4ff" stroke-width="2" fill="none"/>
+  <!-- Eyes -->
+  <circle cx="28" cy="26" r="1.5" fill="#00d4ff"/>
+  <circle cx="36" cy="26" r="1.5" fill="#00d4ff"/>
+  <!-- Smile -->
+  <path d="M27 31 Q32 35 37 31" stroke="#00d4ff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Shoulders -->
+  <path d="M18 52 Q18 44 32 44 Q46 44 46 52" stroke="#00d4ff" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>
